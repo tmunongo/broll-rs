@@ -1,0 +1,6 @@
+*Zone.Identifier
+.env
+.env.production
+*.db
+target/
+downloads/
