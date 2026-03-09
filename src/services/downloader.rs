@@ -1,14 +1,19 @@
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use crate::config::Config;
 use crate::models::DownloadRequest;
 
-pub async fn run(pool: SqlitePool, config: Arc<Config>, http: reqwest::Client, req: DownloadRequest) {
+pub async fn run(
+    pool: SqlitePool,
+    config: Arc<Config>,
+    http: reqwest::Client,
+    req: DownloadRequest,
+) {
     set_status(&pool, &req.id, "downloading").await;
 
     let dir = resolve_dir(&pool, &config, req.project_id.as_deref()).await;
@@ -27,14 +32,12 @@ pub async fn run(pool: SqlitePool, config: Arc<Config>, http: reqwest::Client, r
     match result {
         Ok(path) => {
             let filepath = path.to_string_lossy().to_string();
-            sqlx::query(
-                "UPDATE videos SET status='complete', filepath=? WHERE id=?",
-            )
-            .bind(&filepath)
-            .bind(&req.id)
-            .execute(&pool)
-            .await
-            .ok();
+            sqlx::query("UPDATE videos SET status='complete', filepath=? WHERE id=?")
+                .bind(&filepath)
+                .bind(&req.id)
+                .execute(&pool)
+                .await
+                .ok();
             tracing::info!("Download complete: {filepath}");
         }
         Err(e) => {
@@ -57,12 +60,11 @@ async fn set_status(pool: &SqlitePool, id: &str, status: &str) {
 
 async fn resolve_dir(pool: &SqlitePool, config: &Config, project_id: Option<&str>) -> PathBuf {
     if let Some(pid) = project_id {
-        let row: Option<(String,)> =
-            sqlx::query_as("SELECT slug FROM projects WHERE id=?")
-                .bind(pid)
-                .fetch_optional(pool)
-                .await
-                .unwrap_or(None);
+        let row: Option<(String,)> = sqlx::query_as("SELECT slug FROM projects WHERE id=?")
+            .bind(pid)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
         if let Some((slug,)) = row {
             return config.downloads_dir.join(slug);
         }
@@ -74,16 +76,22 @@ async fn resolve_dir(pool: &SqlitePool, config: &Config, project_id: Option<&str
 
 async fn download_ytdlp(url: &str, dir: &Path, id: &str) -> Result<PathBuf> {
     let safe_id = id.replace('/', "_");
-    let template = dir.join(format!("{safe_id}.%(ext)s")).to_string_lossy().to_string();
+    let template = dir
+        .join(format!("{safe_id}.%(ext)s"))
+        .to_string_lossy()
+        .to_string();
 
     let output = Command::new("yt-dlp")
         .args([
             url,
-            "-o", &template,
+            "-o",
+            &template,
             "--no-playlist",
             "--quiet",
-            "--merge-output-format", "mp4",
-            "-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+            "--merge-output-format",
+            "mp4",
+            "-f",
+            "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
         ])
         .output()
         .await
@@ -123,12 +131,14 @@ async fn download_archive(
     dir: &Path,
     id: &str,
 ) -> Result<PathBuf> {
-    let resolved = resolve_archive_url(client, base_url).await.unwrap_or_else(|| base_url.to_string());
+    let resolved = resolve_archive_url(client, base_url)
+        .await
+        .unwrap_or_else(|| base_url.to_string());
     download_direct(client, &resolved, dir, id).await
 }
 
 async fn resolve_archive_url(client: &reqwest::Client, base_url: &str) -> Option<String> {
-    let identifier = base_url.trim_end_matches('/').split('/').last()?;
+    let identifier = base_url.trim_end_matches('/').split('/').next_back()?;
     let meta_url = format!("https://archive.org/metadata/{identifier}");
 
     let data: serde_json::Value = client.get(&meta_url).send().await.ok()?.json().await.ok()?;
@@ -178,5 +188,8 @@ async fn find_file_with_prefix(dir: &Path, prefix: &str) -> Option<PathBuf> {
 
 fn ext_from_url(url: &str) -> &str {
     let path = url.split('?').next().unwrap_or(url);
-    path.rsplit('.').next().filter(|e| e.len() <= 4).unwrap_or("mp4")
+    path.rsplit('.')
+        .next()
+        .filter(|e| e.len() <= 4)
+        .unwrap_or("mp4")
 }

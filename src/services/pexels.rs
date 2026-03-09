@@ -1,6 +1,6 @@
+use crate::models::VideoResult;
 use anyhow::Result;
 use serde::Deserialize;
-use crate::models::VideoResult;
 
 #[derive(Deserialize)]
 struct PexelsResponse {
@@ -60,7 +60,11 @@ async fn do_search(
     let resp: PexelsResponse = client
         .get("https://api.pexels.com/videos/search")
         .header("Authorization", api_key)
-        .query(&[("query", query), ("per_page", &per_page.to_string()), ("size", "medium")])
+        .query(&[
+            ("query", query),
+            ("per_page", &per_page.to_string()),
+            ("size", "medium"),
+        ])
         .send()
         .await?
         .error_for_status()?
@@ -103,4 +107,3 @@ async fn do_search(
 
     Ok(results)
 }
-

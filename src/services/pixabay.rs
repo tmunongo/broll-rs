@@ -1,6 +1,6 @@
+use crate::models::VideoResult;
 use anyhow::Result;
 use serde::Deserialize;
-use crate::models::VideoResult;
 
 #[derive(Deserialize)]
 struct PixabayResponse {

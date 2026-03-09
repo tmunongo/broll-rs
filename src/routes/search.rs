@@ -1,4 +1,7 @@
-use axum::{extract::{Query, State}, Json};
+use axum::{
+    extract::{Query, State},
+    Json,
+};
 use futures::future::join_all;
 
 use crate::error::AppResult;
@@ -22,18 +25,24 @@ pub async fn handler(
         let client = state.http.clone();
         let key = state.config.pexels_api_key.clone();
         let q2 = q.clone();
-        futs.push(Box::pin(async move { pexels::search(&client, &key, &q2, 8).await }));
+        futs.push(Box::pin(async move {
+            pexels::search(&client, &key, &q2, 8).await
+        }));
     }
     if sources.contains("pixabay") {
         let client = state.http.clone();
         let key = state.config.pixabay_api_key.clone();
         let q2 = q.clone();
-        futs.push(Box::pin(async move { pixabay::search(&client, &key, &q2, 8).await }));
+        futs.push(Box::pin(async move {
+            pixabay::search(&client, &key, &q2, 8).await
+        }));
     }
     if sources.contains("archive") {
         let client = state.http.clone();
         let q2 = q.clone();
-        futs.push(Box::pin(async move { archive::search(&client, &q2, 6).await }));
+        futs.push(Box::pin(
+            async move { archive::search(&client, &q2, 6).await },
+        ));
     }
     if sources.contains("youtube") {
         let q2 = q.clone();

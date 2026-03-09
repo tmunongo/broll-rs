@@ -88,7 +88,13 @@ pub async fn status(
             .await?;
 
     match row {
-        Some((id, status, filepath)) => Ok(Json(StatusResponse { id, status, filepath })),
-        None => Err(AppError::NotFound(format!("No download record for id={id}"))),
+        Some((id, status, filepath)) => Ok(Json(StatusResponse {
+            id,
+            status,
+            filepath,
+        })),
+        None => Err(AppError::NotFound(format!(
+            "No download record for id={id}"
+        ))),
     }
 }

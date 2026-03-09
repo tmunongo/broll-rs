@@ -1,4 +1,4 @@
-# B-Roll Harness (Rust/Axum)
+# B-Roll Studio
 
 A fast, local research workbench for finding, previewing, and archiving royalty-free video clips.  
 Search Pexels · Pixabay · Internet Archive · YouTube from one interface.  
@@ -6,28 +6,67 @@ Organise downloads into **projects** — each project gets its own subdirectory.
 
 ---
 
-## Quick Start
+## Quick Start (Using Make)
+
+We provide a `Makefile` for streamlined local development and versioning.
 
 ```bash
 # Prerequisites
-brew install rust ffmpeg     # macOS
-pip install yt-dlp
+# 1. Install Rust via rustup (https://rustup.rs/):
+#    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# 2. Install ffmpeg & python3 via your OS package manager:
+#    macOS: brew install ffmpeg python3
+#    Debian/Ubuntu: apt install ffmpeg python3
+#    Windows: winget install ffmpeg python3
 
-# Build & run
-export PEXELS_API_KEY=your_key
-export PIXABAY_API_KEY=your_key
-cargo run --release
+# Clone & enter directory
+git clone https://github.com/tmunongo/broll-rs.git
+cd broll-rs
+
+# Setup API keys (Pexels, Pixabay)
+cp .env.example .env # Or create a .env file and populate it
+
+# Build & run locally
+make dev
 ```
 
 Open http://localhost:8000
 
 ---
 
-## Docker
+## Setup & Code Quality Checks
 
+To ensure your code meets the quality standards before committing, you can install the pre-commit git hooks:
 ```bash
-PEXELS_API_KEY=xxx PIXABAY_API_KEY=yyy docker-compose up --build
+make install-hooks
 ```
+You can also manually run the tests and checks via:
+```bash
+make check   # Runs clippy and rustfmt
+make test    # Runs cargo test
+make precommit # Runs both
+```
+
+---
+
+## Docker & Raspberry Pi (Multi-Arch)
+
+The included `Dockerfile` is optimized to run natively on both `linux/amd64` (Standard PCs) and `linux/arm64` (Raspberry Pi 4/5, Apple Silicon). 
+A GitHub Actions workflow is included (`.github/workflows/docker.yml`) that automatically builds and pushes these multi-arch images to `ghcr.io` whenever a new semantic version tag is pushed (e.g., `v1.0.0`).
+
+### Running via Docker Compose
+```bash
+docker-compose up --build
+```
+
+### Releasing a new version via Makefile
+When you're ready to deploy a new version to GHCR, use the release commands:
+```bash
+make version-patch   # Bumps v0.1.0 -> v0.1.1
+make version-minor   # Bumps v0.1.0 -> v0.2.0
+make version-major   # Bumps v0.1.0 -> v1.0.0
+```
+This automatically updates `Cargo.toml`, creates a git commit, and tags the release. Just run `git push && git push --tags` afterwards to trigger the GitHub Actions pipeline.
 
 ---
 

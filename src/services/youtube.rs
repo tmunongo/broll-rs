@@ -1,7 +1,7 @@
+use crate::models::VideoResult;
 use anyhow::Result;
 use serde::Deserialize;
 use tokio::process::Command;
-use crate::models::VideoResult;
 
 #[derive(Deserialize)]
 struct YtInfo {

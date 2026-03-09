@@ -6,14 +6,13 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
-use crate::models::{CreateProjectRequest, Project, slugify};
+use crate::models::{slugify, CreateProjectRequest, Project};
 use crate::state::AppState;
 
 pub async fn list(State(state): State<AppState>) -> AppResult<Json<Vec<Project>>> {
-    let projects: Vec<Project> =
-        sqlx::query_as("SELECT * FROM projects ORDER BY created_at DESC")
-            .fetch_all(&state.pool)
-            .await?;
+    let projects: Vec<Project> = sqlx::query_as("SELECT * FROM projects ORDER BY created_at DESC")
+        .fetch_all(&state.pool)
+        .await?;
     Ok(Json(projects))
 }
 
@@ -28,28 +27,28 @@ pub async fn create(
 
     let slug = slugify(&name);
     if slug.is_empty() {
-        return Err(AppError::BadRequest("Project name produces an empty slug".into()));
+        return Err(AppError::BadRequest(
+            "Project name produces an empty slug".into(),
+        ));
     }
 
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
-    sqlx::query(
-        "INSERT INTO projects (id, name, slug, created_at) VALUES (?, ?, ?, ?)",
-    )
-    .bind(&id)
-    .bind(&name)
-    .bind(&slug)
-    .bind(&now)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| {
-        if e.to_string().contains("UNIQUE") {
-            AppError::BadRequest(format!("Project '{name}' already exists"))
-        } else {
-            AppError::Sqlx(e)
-        }
-    })?;
+    sqlx::query("INSERT INTO projects (id, name, slug, created_at) VALUES (?, ?, ?, ?)")
+        .bind(&id)
+        .bind(&name)
+        .bind(&slug)
+        .bind(&now)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            if e.to_string().contains("UNIQUE") {
+                AppError::BadRequest(format!("Project '{name}' already exists"))
+            } else {
+                AppError::Sqlx(e)
+            }
+        })?;
 
     let project: Project = sqlx::query_as("SELECT * FROM projects WHERE id=?")
         .bind(&id)

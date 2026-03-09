@@ -1,6 +1,6 @@
+use crate::models::VideoResult;
 use anyhow::Result;
 use serde::Deserialize;
-use crate::models::VideoResult;
 
 const SEARCH_URL: &str = "https://archive.org/advancedsearch.php";
 const BASE_URL: &str = "https://archive.org";
@@ -32,11 +32,7 @@ pub async fn search(client: &reqwest::Client, query: &str, rows: usize) -> Vec<V
     }
 }
 
-async fn do_search(
-    client: &reqwest::Client,
-    query: &str,
-    rows: usize,
-) -> Result<Vec<VideoResult>> {
+async fn do_search(client: &reqwest::Client, query: &str, rows: usize) -> Result<Vec<VideoResult>> {
     let q = format!("{query} AND mediatype:movies");
     let resp: ArchiveResponse = client
         .get(SEARCH_URL)
@@ -63,9 +59,10 @@ async fn do_search(
                 .title
                 .and_then(|v| match v {
                     serde_json::Value::String(s) => Some(s),
-                    serde_json::Value::Array(a) => {
-                        a.into_iter().next().and_then(|v| v.as_str().map(str::to_string))
-                    }
+                    serde_json::Value::Array(a) => a
+                        .into_iter()
+                        .next()
+                        .and_then(|v| v.as_str().map(str::to_string)),
                     _ => None,
                 })
                 .unwrap_or_else(|| id.clone());

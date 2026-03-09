@@ -42,11 +42,10 @@ pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let row: Option<(Option<String>,)> =
-        sqlx::query_as("SELECT filepath FROM videos WHERE id=?")
-            .bind(&id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let row: Option<(Option<String>,)> = sqlx::query_as("SELECT filepath FROM videos WHERE id=?")
+        .bind(&id)
+        .fetch_optional(&state.pool)
+        .await?;
 
     let Some((filepath,)) = row else {
         return Err(AppError::NotFound(format!("id={id}")));
@@ -91,11 +90,10 @@ pub async fn serve_file(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<impl IntoResponse> {
-    let row: Option<(Option<String>,)> =
-        sqlx::query_as("SELECT filepath FROM videos WHERE id=?")
-            .bind(&id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let row: Option<(Option<String>,)> = sqlx::query_as("SELECT filepath FROM videos WHERE id=?")
+        .bind(&id)
+        .fetch_optional(&state.pool)
+        .await?;
 
     let Some((Some(fp),)) = row else {
         return Err(AppError::NotFound("File not found".into()));
@@ -119,7 +117,10 @@ pub async fn serve_file(
     Ok((
         [
             ("content-type", "video/mp4".to_string()),
-            ("content-disposition", format!("attachment; filename=\"{filename}\"")),
+            (
+                "content-disposition",
+                format!("attachment; filename=\"{filename}\""),
+            ),
         ],
         body,
     ))
