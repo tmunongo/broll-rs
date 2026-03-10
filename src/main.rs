@@ -6,6 +6,9 @@ mod routes;
 mod services;
 mod state;
 
+#[cfg(test)]
+mod tests;
+
 use axum::{
     response::Html,
     routing::{delete, get, patch, post},
@@ -22,6 +25,30 @@ const INDEX_HTML: &str = include_str!("../templates/index.html");
 
 async fn index() -> Html<&'static str> {
     Html(INDEX_HTML)
+}
+
+pub fn build_app(state: AppState) -> Router {
+    Router::new()
+        // UI
+        .route("/", get(index))
+        // Search
+        .route("/api/search", get(routes::search::handler))
+        // Download
+        .route("/api/download", post(routes::download::start))
+        .route("/api/download/status/:id", get(routes::download::status))
+        // Library
+        .route("/api/library", get(routes::library::list))
+        .route("/api/library/:id", delete(routes::library::delete))
+        .route("/api/library/:id/tags", patch(routes::library::update_tags))
+        .route("/api/library/file/:id", get(routes::library::serve_file))
+        // Projects
+        .route(
+            "/api/projects",
+            get(routes::projects::list).post(routes::projects::create),
+        )
+        .route("/api/projects/:id", delete(routes::projects::delete))
+        .layer(CorsLayer::permissive())
+        .with_state(state)
 }
 
 #[tokio::main]
@@ -53,27 +80,7 @@ async fn main() -> anyhow::Result<()> {
         http,
     };
 
-    let app = Router::new()
-        // UI
-        .route("/", get(index))
-        // Search
-        .route("/api/search", get(routes::search::handler))
-        // Download
-        .route("/api/download", post(routes::download::start))
-        .route("/api/download/status/:id", get(routes::download::status))
-        // Library
-        .route("/api/library", get(routes::library::list))
-        .route("/api/library/:id", delete(routes::library::delete))
-        .route("/api/library/:id/tags", patch(routes::library::update_tags))
-        .route("/api/library/file/:id", get(routes::library::serve_file))
-        // Projects
-        .route(
-            "/api/projects",
-            get(routes::projects::list).post(routes::projects::create),
-        )
-        .route("/api/projects/:id", delete(routes::projects::delete))
-        .layer(CorsLayer::permissive())
-        .with_state(state);
+    let app = build_app(state);
 
     let addr = format!("0.0.0.0:{}", config.port);
     tracing::info!("Listening on http://{addr}");

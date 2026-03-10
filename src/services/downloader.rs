@@ -193,3 +193,162 @@ fn ext_from_url(url: &str) -> &str {
         .filter(|e| e.len() <= 4)
         .unwrap_or("mp4")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use wiremock::matchers::method;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    // ── ext_from_url ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn ext_from_simple_url() {
+        assert_eq!(ext_from_url("https://example.com/video.mp4"), "mp4");
+    }
+
+    #[test]
+    fn ext_from_url_with_query_string() {
+        assert_eq!(ext_from_url("https://example.com/video.webm?token=abc"), "webm");
+    }
+
+    #[test]
+    fn ext_from_url_no_extension() {
+        assert_eq!(ext_from_url("https://example.com/video"), "mp4");
+    }
+
+    #[test]
+    fn ext_from_url_long_extension_falls_back() {
+        // ".download" is 8 chars, longer than 4 → fallback to "mp4"
+        assert_eq!(ext_from_url("https://example.com/video.download"), "mp4");
+    }
+
+    #[test]
+    fn ext_from_url_mov() {
+        assert_eq!(ext_from_url("https://cdn.example.com/clip.mov"), "mov");
+    }
+
+    // ── find_file_with_prefix ─────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn find_file_with_prefix_finds_file() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("abc123.mp4");
+        tokio::fs::File::create(&file_path).await.unwrap();
+
+        let found = find_file_with_prefix(dir.path(), "abc123").await;
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().file_name().unwrap(), "abc123.mp4");
+    }
+
+    #[tokio::test]
+    async fn find_file_with_prefix_returns_none_when_no_match() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("xyz999.mp4");
+        tokio::fs::File::create(&file_path).await.unwrap();
+
+        let found = find_file_with_prefix(dir.path(), "abc123").await;
+        assert!(found.is_none());
+    }
+
+    #[tokio::test]
+    async fn find_file_with_prefix_empty_dir() {
+        let dir = tempdir().unwrap();
+        let found = find_file_with_prefix(dir.path(), "abc").await;
+        assert!(found.is_none());
+    }
+
+    // ── download_direct ───────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn download_direct_streams_to_file() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"fake video bytes"))
+            .mount(&server)
+            .await;
+
+        let dir = tempdir().unwrap();
+        let client = reqwest::Client::new();
+        let url = format!("{}/video.mp4", server.uri());
+
+        let path = download_direct(&client, &url, dir.path(), "test_id").await.unwrap();
+        assert!(path.exists());
+
+        let contents = tokio::fs::read(&path).await.unwrap();
+        assert_eq!(contents, b"fake video bytes");
+    }
+
+    #[tokio::test]
+    async fn download_direct_fails_on_404() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        let dir = tempdir().unwrap();
+        let client = reqwest::Client::new();
+        let url = format!("{}/missing.mp4", server.uri());
+
+        let result = download_direct(&client, &url, dir.path(), "test_id").await;
+        assert!(result.is_err());
+    }
+
+    // ── resolve_dir (no project_id) ────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn resolve_dir_with_no_project_returns_base() {
+        let pool = crate::db::init_pool("sqlite::memory:").await.unwrap();
+        let config = Config {
+            pexels_api_key: "".into(),
+            pixabay_api_key: "".into(),
+            downloads_dir: std::path::PathBuf::from("/tmp/broll-test"),
+            database_url: "sqlite::memory:".into(),
+            port: 8000,
+        };
+
+        let dir = resolve_dir(&pool, &config, None).await;
+        assert_eq!(dir, std::path::PathBuf::from("/tmp/broll-test"));
+    }
+
+    #[tokio::test]
+    async fn resolve_dir_with_unknown_project_returns_base() {
+        let pool = crate::db::init_pool("sqlite::memory:").await.unwrap();
+        let config = Config {
+            pexels_api_key: "".into(),
+            pixabay_api_key: "".into(),
+            downloads_dir: std::path::PathBuf::from("/tmp/broll-test"),
+            database_url: "sqlite::memory:".into(),
+            port: 8000,
+        };
+
+        let dir = resolve_dir(&pool, &config, Some("unknown-id")).await;
+        assert_eq!(dir, std::path::PathBuf::from("/tmp/broll-test"));
+    }
+
+    #[tokio::test]
+    async fn resolve_dir_with_known_project_returns_slug_dir() {
+        let pool = crate::db::init_pool("sqlite::memory:").await.unwrap();
+        sqlx::query(
+            "INSERT INTO projects (id, name, slug, created_at) VALUES ('p1','Nature Docs','nature-docs','2024-01-01')"
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let config = Config {
+            pexels_api_key: "".into(),
+            pixabay_api_key: "".into(),
+            downloads_dir: std::path::PathBuf::from("/tmp/broll-test"),
+            database_url: "sqlite::memory:".into(),
+            port: 8000,
+        };
+
+        let dir = resolve_dir(&pool, &config, Some("p1")).await;
+        assert_eq!(dir, std::path::PathBuf::from("/tmp/broll-test/nature-docs"));
+    }
+}
