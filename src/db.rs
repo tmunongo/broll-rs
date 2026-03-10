@@ -90,20 +90,14 @@ mod tests {
 
     #[tokio::test]
     async fn init_pool_is_idempotent() {
-        // Running init on the same in-memory pool again should not fail (CREATE IF NOT EXISTS)
-        let pool = init_pool("sqlite::memory:").await.expect("pool init 1");
-        // Re-run the schema statements via a fresh call would need the same pool,
-        // but we can at least verify two separate in-memory DBs initialize cleanly
-        let pool2 = init_pool("sqlite::memory:").await.expect("pool init 2");
+        // Use a shared in-memory DB or same pool
+        let db_url = "sqlite::memory:?cache=shared";
+        let pool = init_pool(db_url).await.expect("pool init 1");
+        let _pool2 = init_pool(db_url).await.expect("pool init 2");
         let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM projects")
             .fetch_one(&pool)
             .await
             .unwrap();
-        let count2: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM projects")
-            .fetch_one(&pool2)
-            .await
-            .unwrap();
         assert_eq!(count.0, 0);
-        assert_eq!(count2.0, 0);
     }
 }

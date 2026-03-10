@@ -72,6 +72,7 @@ pub struct SearchParams {
 
 #[derive(Debug, Deserialize)]
 pub struct LibraryParams {
+    #[serde(default)]
     pub project_id: Option<String>,
 }
 

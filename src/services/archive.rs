@@ -161,19 +161,15 @@ mod tests {
         let server = MockServer::start().await;
 
         Mock::given(method("GET"))
-            .and(path("/advancedsearch.php"))
+            // We use any path because the base URL from the server will be used directly
             .respond_with(ResponseTemplate::new(500))
             .mount(&server)
             .await;
 
         let client = reqwest::Client::new();
-        // We can't easily override SEARCH_URL in the current design, so we
-        // test via do_search indirectly: if the public `search` on a real (offline)
-        // URL fails, it returns vec![].
-        // Instead, directly test that a response parse failure returns empty.
-        let results = search(&client, "test_query_that_will_fail_offline_____xyz987", 1).await;
-        // In a test env with no internet, or with a bad URL, returns empty vec
-        assert!(results.is_empty() || !results.is_empty()); // always passes; real assert below
+        // Call do_search to explicitly hit the mocked server and confirm it handles 500 cleanly
+        let results = do_search(&client, &server.uri(), "test_query", 1).await;
+        assert!(results.is_err());
     }
 
     #[tokio::test]

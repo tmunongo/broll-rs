@@ -236,6 +236,18 @@ async fn update_tags_not_found() {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
+#[tokio::test]
+async fn serve_file_not_found() {
+    let app = build_app().await;
+    let req = Request::builder()
+        .uri("/api/library/nonexistent-id/file")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
 // ── Download routes ───────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -297,7 +309,8 @@ async fn download_status_after_start() {
         .header("content-type", "application/json")
         .body(Body::from(body.to_string()))
         .unwrap();
-    app.clone().oneshot(req).await.unwrap();
+    let post_resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(post_resp.status(), StatusCode::OK);
 
     // Check status
     let req = Request::builder()

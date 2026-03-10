@@ -132,8 +132,8 @@ mod tests {
             .await;
 
         let client = reqwest::Client::new();
-        // Since it hits the real or mock URL, we test failure easily.
-        let results = do_search(&client, &server.uri(), "valid_key", "test", 1).await;
+        let url = format!("{}{}", server.uri(), "/videos/search");
+        let results = do_search(&client, &url, "valid_key", "test", 1).await;
         assert!(results.is_err());
     }
 
