@@ -39,7 +39,7 @@ async fn do_search(
     rows: usize,
 ) -> Result<Vec<VideoResult>> {
     let q = format!("{query} AND mediatype:movies");
-    let resp: ArchiveResponse = client
+    let resp_text = client
         .get(search_url)
         .query(&[
             ("q", q.as_str()),
@@ -51,8 +51,16 @@ async fn do_search(
         .send()
         .await?
         .error_for_status()?
-        .json()
+        .text()
         .await?;
+
+    let resp: ArchiveResponse = match serde_json::from_str(&resp_text) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!("Archive JSON decode error: {e}. Raw body: {resp_text}");
+            return Err(e.into());
+        }
+    };
 
     let results = resp
         .response

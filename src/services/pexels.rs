@@ -58,7 +58,7 @@ async fn do_search(
     query: &str,
     per_page: usize,
 ) -> Result<Vec<VideoResult>> {
-    let resp: PexelsResponse = client
+    let resp_text = client
         .get(search_url)
         .header("Authorization", api_key)
         .query(&[
@@ -69,8 +69,16 @@ async fn do_search(
         .send()
         .await?
         .error_for_status()?
-        .json()
+        .text()
         .await?;
+
+    let resp: PexelsResponse = match serde_json::from_str(&resp_text) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!("Pexels JSON decode error: {e}. Raw body: {resp_text}");
+            return Err(e.into());
+        }
+    };
 
     let results = resp
         .videos

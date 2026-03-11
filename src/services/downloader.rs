@@ -41,7 +41,9 @@ pub async fn run(
             tracing::info!("Download complete: {filepath}");
         }
         Err(e) => {
-            tracing::error!("Download failed for {}: {e}", req.id);
+            let err_msg = format!("Download failed for {}: {e:?}", req.id);
+            tracing::error!("{}", err_msg);
+            let _ = std::fs::write("download_error.txt", err_msg);
             set_status(&pool, &req.id, "error").await;
         }
     }

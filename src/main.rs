@@ -27,10 +27,14 @@ async fn index() -> Html<&'static str> {
     Html(INDEX_HTML)
 }
 
+
+
 pub fn build_app(state: AppState) -> Router {
     Router::new()
         // UI
         .route("/", get(index))
+        .nest_service("/app.css", tower_http::services::ServeFile::new("templates/app.css"))
+        .nest_service("/app.js", tower_http::services::ServeFile::new("templates/app.js"))
         // Search
         .route("/api/search", get(routes::search::handler))
         // Download
@@ -48,6 +52,7 @@ pub fn build_app(state: AppState) -> Router {
         )
         .route("/api/projects/:id", delete(routes::projects::delete))
         .layer(CorsLayer::permissive())
+        .layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(state)
 }
 
@@ -71,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
 
     let http = reqwest::Client::builder()
         .user_agent("broll-harness/1.0")
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(600)) // 10 minutes to allow slow video downloads
         .build()?;
 
     let state = AppState {
