@@ -4,3 +4,13 @@
 *.db
 target/
 downloads/
+
+sqlite*
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-corrupt
+
+download_error.txt
+.log
