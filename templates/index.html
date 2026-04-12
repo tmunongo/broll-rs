@@ -90,7 +90,7 @@
         <button
           class="project-all"
           :class="activeProjectFilter === null ? 'active' : ''"
-          @click="activeProjectFilter = null"
+          @click="setActiveProject(null)"
         >
           <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
@@ -103,7 +103,7 @@
           <div
             class="project-item"
             :class="activeProjectFilter === proj.id ? 'active' : ''"
-            @click="activeProjectFilter = proj.id"
+            @click="setActiveProject(proj.id)"
           >
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" x-text="proj.name"></span>
             <button class="project-del" @click.stop="deleteProject(proj.id)" title="Delete project">×</button>

@@ -38,6 +38,7 @@ function brollApp() {
 
     // ── Lifecycle ──────────────────────────────────────────────────────
     init() {
+      this.activeProjectFilter = localStorage.getItem('broll:activeProject') || null;
       this.loadProjects();
       this.loadLibrary();
       // Auto-refresh while downloads are running
@@ -45,6 +46,15 @@ function brollApp() {
         const hasActive = Object.values(this.dlStates).some(s => s === 'active');
         if (hasActive) this.loadLibrary();
       }, 5000);
+    },
+
+    setActiveProject(id) {
+      this.activeProjectFilter = id;
+      if (id) {
+        localStorage.setItem('broll:activeProject', id);
+      } else {
+        localStorage.removeItem('broll:activeProject');
+      }
     },
 
     get filteredLibrary() {
@@ -232,7 +242,7 @@ function brollApp() {
     async deleteProject(id) {
       try {
         await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-        if (this.activeProjectFilter === id) this.activeProjectFilter = null;
+        if (this.activeProjectFilter === id) this.setActiveProject(null);
         await this.loadProjects();
         await this.loadLibrary();
         this.toast('Project deleted', 'info');
