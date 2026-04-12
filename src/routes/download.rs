@@ -77,6 +77,78 @@ pub async fn start(
     Ok(Json(record))
 }
 
+pub async fn retry(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> AppResult<Json<LibraryVideo>> {
+    // Look up the existing record
+    let record: Option<LibraryVideo> = sqlx::query_as(
+        "SELECT v.*, p.name as project_name
+         FROM videos v
+         LEFT JOIN projects p ON v.project_id = p.id
+         WHERE v.id = ?",
+    )
+    .bind(&id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    let record = match record {
+        Some(r) => r,
+        None => return Err(AppError::NotFound(format!("No record for id={id}"))),
+    };
+
+    if record.status != "error" {
+        return Err(AppError::BadRequest(format!(
+            "Can only retry failed downloads (current status: {})",
+            record.status,
+        )));
+    }
+
+    let download_url = record.original_url.clone().unwrap_or_default();
+    if download_url.is_empty() {
+        return Err(AppError::BadRequest(
+            "No original URL stored — cannot retry".into(),
+        ));
+    }
+
+    // Reset status
+    sqlx::query("UPDATE videos SET status='pending' WHERE id=?")
+        .bind(&id)
+        .execute(&state.pool)
+        .await?;
+
+    // Fetch updated record to return
+    let updated: LibraryVideo = sqlx::query_as(
+        "SELECT v.*, p.name as project_name
+         FROM videos v
+         LEFT JOIN projects p ON v.project_id = p.id
+         WHERE v.id = ?",
+    )
+    .bind(&id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    // Re-spawn the download
+    let req = DownloadRequest {
+        id: record.id,
+        title: record.title,
+        source: record.source,
+        download_url,
+        thumbnail: record.thumbnail,
+        duration: record.duration,
+        project_id: record.project_id,
+    };
+
+    let pool = state.pool.clone();
+    let config = state.config.clone();
+    let http = state.http.clone();
+    tokio::spawn(async move {
+        downloader::run(pool, config, http, req).await;
+    });
+
+    Ok(Json(updated))
+}
+
 pub async fn status(
     State(state): State<AppState>,
     Path(id): Path<String>,

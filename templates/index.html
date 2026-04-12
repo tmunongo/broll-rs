@@ -221,6 +221,7 @@
               </template>
               <span class="lib-status" :class="item.status" x-text="item.status"></span>
             </div>
+            <button class="lib-retry" x-show="item.status === 'error'" @click="retryDownload(item.id)" title="Retry download">↻</button>
             <button class="lib-del" @click="deleteClip(item.id)" title="Remove">×</button>
           </div>
         </template>

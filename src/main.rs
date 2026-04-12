@@ -40,6 +40,7 @@ pub fn build_app(state: AppState) -> Router {
         // Download
         .route("/api/download", post(routes::download::start))
         .route("/api/download/status/:id", get(routes::download::status))
+        .route("/api/download/retry/:id", post(routes::download::retry))
         // Library
         .route("/api/library", get(routes::library::list))
         .route("/api/library/:id", delete(routes::library::delete))

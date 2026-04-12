@@ -387,6 +387,13 @@ header {
 }
 .lib-del:hover { color: var(--red); }
 
+.lib-retry {
+  background: none; border: none; color: var(--text-faint);
+  cursor: pointer; font-size: 14px; line-height: 1;
+  transition: color .12s; flex-shrink: 0;
+}
+.lib-retry:hover { color: var(--amber); }
+
 .empty-state {
   padding: 36px 16px; text-align: center;
   color: var(--text-dim);

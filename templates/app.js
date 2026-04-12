@@ -180,6 +180,25 @@ function brollApp() {
       } catch (_) { this.toast('Delete failed', 'error'); }
     },
 
+    async retryDownload(id) {
+      this.dlStates[id] = 'active';
+      this.toast('Retrying download…', 'info');
+      try {
+        const res = await fetch(`/api/download/retry/${encodeURIComponent(id)}`, {
+          method: 'POST',
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Retry failed');
+        }
+        this.loadLibrary();
+        this.pollStatus(id);
+      } catch (e) {
+        this.dlStates[id] = 'error';
+        this.toast('Retry failed: ' + e.message, 'error');
+      }
+    },
+
     // ── Projects ──────────────────────────────────────────────────────
     async loadProjects() {
       try {

@@ -550,3 +550,129 @@ async fn list_library_filtered_by_project() {
     assert_eq!(arr.len(), 1);
     assert_eq!(arr[0]["id"], "v4");
 }
+
+// ── Retry download routes ─────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn retry_download_not_found() {
+    let app = build_app().await;
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/download/retry/nonexistent-id")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn retry_download_rejects_non_error_status() {
+    let pool = db::init_pool("sqlite::memory:").await.unwrap();
+
+    // Insert a record with status='complete' — retry should be rejected
+    sqlx::query(
+        "INSERT INTO videos (id, title, source, status, original_url, created_at) \
+         VALUES ('ok-vid', 'OK', 'pexels', 'complete', 'https://example.com/v.mp4', '2024-01-01')"
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let config = Arc::new(Config {
+        pexels_api_key: String::new(),
+        pixabay_api_key: String::new(),
+        downloads_dir: std::path::PathBuf::from("/tmp/broll-test-retry"),
+        database_url: "sqlite::memory:".into(),
+        port: 8000,
+    });
+
+    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let app = Router::new()
+        .route("/api/download/retry/:id", post(routes::download::retry))
+        .with_state(state);
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/download/retry/ok-vid")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn retry_download_resets_error_to_pending() {
+    let pool = db::init_pool("sqlite::memory:").await.unwrap();
+
+    // Insert a failed record with an original_url
+    sqlx::query(
+        "INSERT INTO videos (id, title, source, status, original_url, created_at) \
+         VALUES ('fail-vid', 'Failed', 'pexels', 'error', 'https://example.com/v.mp4', '2024-01-01')"
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let config = Arc::new(Config {
+        pexels_api_key: String::new(),
+        pixabay_api_key: String::new(),
+        downloads_dir: std::path::PathBuf::from("/tmp/broll-test-retry"),
+        database_url: "sqlite::memory:".into(),
+        port: 8000,
+    });
+
+    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let app = Router::new()
+        .route("/api/download/retry/:id", post(routes::download::retry))
+        .with_state(state);
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/download/retry/fail-vid")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let json = body_json(resp).await;
+    assert_eq!(json["id"], "fail-vid");
+    assert_eq!(json["status"], "pending");
+}
+
+#[tokio::test]
+async fn retry_download_no_original_url_returns_400() {
+    let pool = db::init_pool("sqlite::memory:").await.unwrap();
+
+    // Insert a failed record WITHOUT an original_url
+    sqlx::query(
+        "INSERT INTO videos (id, title, source, status, created_at) \
+         VALUES ('no-url-vid', 'No URL', 'pexels', 'error', '2024-01-01')"
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let config = Arc::new(Config {
+        pexels_api_key: String::new(),
+        pixabay_api_key: String::new(),
+        downloads_dir: std::path::PathBuf::from("/tmp/broll-test-retry"),
+        database_url: "sqlite::memory:".into(),
+        port: 8000,
+    });
+
+    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let app = Router::new()
+        .route("/api/download/retry/:id", post(routes::download::retry))
+        .with_state(state);
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/download/retry/no-url-vid")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
