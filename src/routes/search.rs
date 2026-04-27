@@ -46,7 +46,10 @@ pub async fn handler(
     }
     if sources.contains("youtube") {
         let q2 = q.clone();
-        futs.push(Box::pin(async move { youtube::search(&q2, 8).await }));
+        let cookies = state.config.youtube_cookies_browser.clone();
+        futs.push(Box::pin(async move {
+            youtube::search(&q2, 8, cookies.as_deref()).await
+        }));
     }
 
     let all = join_all(futs).await;

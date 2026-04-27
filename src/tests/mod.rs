@@ -14,12 +14,7 @@ use axum::{
 use serde_json::Value;
 use tower::ServiceExt; // for `oneshot`
 
-use crate::{
-    config::Config,
-    db,
-    routes,
-    state::AppState,
-};
+use crate::{config::Config, db, routes, state::AppState};
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -34,6 +29,7 @@ async fn build_app() -> Router {
         downloads_dir: std::path::PathBuf::from("/tmp/broll-test-routes"),
         database_url: "sqlite::memory:".into(),
         port: 8000,
+        youtube_cookies_browser: None,
     });
 
     let http = reqwest::Client::new();
@@ -49,7 +45,11 @@ async fn index_returns_html() {
     let resp = app.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
-        resp.headers().get("content-type").unwrap().to_str().unwrap(),
+        resp.headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap(),
         "text/html; charset=utf-8"
     );
 }
@@ -343,9 +343,14 @@ async fn start_download_existing_complete_returns_existing() {
         downloads_dir: std::path::PathBuf::from("/tmp/broll-test-routes"),
         database_url: "sqlite::memory:".into(),
         port: 8000,
+        youtube_cookies_browser: None,
     });
 
-    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let state = AppState {
+        pool,
+        config,
+        http: reqwest::Client::new(),
+    };
     let app = Router::new()
         .route("/api/download", post(routes::download::start))
         .with_state(state);
@@ -410,9 +415,14 @@ async fn list_library_with_seed_data() {
         downloads_dir: "/tmp/broll".into(),
         database_url: "sqlite::memory:".into(),
         port: 8000,
+        youtube_cookies_browser: None,
     });
 
-    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let state = AppState {
+        pool,
+        config,
+        http: reqwest::Client::new(),
+    };
     let app = Router::new()
         .route("/api/library", get(routes::library::list))
         .with_state(state);
@@ -446,9 +456,14 @@ async fn update_tags_success() {
         downloads_dir: "/tmp/broll".into(),
         database_url: "sqlite::memory:".into(),
         port: 8000,
+        youtube_cookies_browser: None,
     });
 
-    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let state = AppState {
+        pool,
+        config,
+        http: reqwest::Client::new(),
+    };
     let app = Router::new()
         .route("/api/library/:id/tags", patch(routes::library::update_tags))
         .with_state(state);
@@ -483,9 +498,14 @@ async fn delete_library_item_success() {
         downloads_dir: "/tmp/broll".into(),
         database_url: "sqlite::memory:".into(),
         port: 8000,
+        youtube_cookies_browser: None,
     });
 
-    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let state = AppState {
+        pool,
+        config,
+        http: reqwest::Client::new(),
+    };
     let app = Router::new()
         .route("/api/library/:id", delete(routes::library::delete))
         .with_state(state);
@@ -532,9 +552,14 @@ async fn list_library_filtered_by_project() {
         downloads_dir: "/tmp/broll".into(),
         database_url: "sqlite::memory:".into(),
         port: 8000,
+        youtube_cookies_browser: None,
     });
 
-    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let state = AppState {
+        pool,
+        config,
+        http: reqwest::Client::new(),
+    };
     let app = Router::new()
         .route("/api/library", get(routes::library::list))
         .with_state(state);
@@ -573,7 +598,7 @@ async fn retry_download_rejects_non_error_status() {
     // Insert a record with status='complete' — retry should be rejected
     sqlx::query(
         "INSERT INTO videos (id, title, source, status, original_url, created_at) \
-         VALUES ('ok-vid', 'OK', 'pexels', 'complete', 'https://example.com/v.mp4', '2024-01-01')"
+         VALUES ('ok-vid', 'OK', 'pexels', 'complete', 'https://example.com/v.mp4', '2024-01-01')",
     )
     .execute(&pool)
     .await
@@ -585,9 +610,14 @@ async fn retry_download_rejects_non_error_status() {
         downloads_dir: std::path::PathBuf::from("/tmp/broll-test-retry"),
         database_url: "sqlite::memory:".into(),
         port: 8000,
+        youtube_cookies_browser: None,
     });
 
-    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let state = AppState {
+        pool,
+        config,
+        http: reqwest::Client::new(),
+    };
     let app = Router::new()
         .route("/api/download/retry/:id", post(routes::download::retry))
         .with_state(state);
@@ -621,9 +651,14 @@ async fn retry_download_resets_error_to_pending() {
         downloads_dir: std::path::PathBuf::from("/tmp/broll-test-retry"),
         database_url: "sqlite::memory:".into(),
         port: 8000,
+        youtube_cookies_browser: None,
     });
 
-    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let state = AppState {
+        pool,
+        config,
+        http: reqwest::Client::new(),
+    };
     let app = Router::new()
         .route("/api/download/retry/:id", post(routes::download::retry))
         .with_state(state);
@@ -648,7 +683,7 @@ async fn retry_download_no_original_url_returns_400() {
     // Insert a failed record WITHOUT an original_url
     sqlx::query(
         "INSERT INTO videos (id, title, source, status, created_at) \
-         VALUES ('no-url-vid', 'No URL', 'pexels', 'error', '2024-01-01')"
+         VALUES ('no-url-vid', 'No URL', 'pexels', 'error', '2024-01-01')",
     )
     .execute(&pool)
     .await
@@ -660,9 +695,14 @@ async fn retry_download_no_original_url_returns_400() {
         downloads_dir: std::path::PathBuf::from("/tmp/broll-test-retry"),
         database_url: "sqlite::memory:".into(),
         port: 8000,
+        youtube_cookies_browser: None,
     });
 
-    let state = AppState { pool, config, http: reqwest::Client::new() };
+    let state = AppState {
+        pool,
+        config,
+        http: reqwest::Client::new(),
+    };
     let app = Router::new()
         .route("/api/download/retry/:id", post(routes::download::retry))
         .with_state(state);

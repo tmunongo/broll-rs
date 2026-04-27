@@ -52,7 +52,9 @@ mod tests {
 
     #[tokio::test]
     async fn init_pool_creates_tables() {
-        let pool = init_pool("sqlite::memory:").await.expect("pool should initialize");
+        let pool = init_pool("sqlite::memory:")
+            .await
+            .expect("pool should initialize");
 
         // Verify 'projects' table exists by inserting and querying
         sqlx::query(
@@ -71,7 +73,9 @@ mod tests {
 
     #[tokio::test]
     async fn init_pool_creates_videos_table() {
-        let pool = init_pool("sqlite::memory:").await.expect("pool should initialize");
+        let pool = init_pool("sqlite::memory:")
+            .await
+            .expect("pool should initialize");
 
         // Verify 'videos' table exists
         sqlx::query(

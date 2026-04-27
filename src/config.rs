@@ -7,6 +7,7 @@ pub struct Config {
     pub downloads_dir: PathBuf,
     pub database_url: String,
     pub port: u16,
+    pub youtube_cookies_browser: Option<String>,
 }
 
 impl Config {
@@ -24,6 +25,7 @@ impl Config {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(8000),
+            youtube_cookies_browser: std::env::var("YOUTUBE_COOKIES_BROWSER").ok(),
         }
     }
 }
@@ -33,7 +35,7 @@ mod tests {
     use super::*;
     use std::env;
     use std::sync::Mutex;
-    
+
     // Use a static mutex so we don't race setting env vars across threads
     lazy_static::lazy_static! {
         static ref ENV_LOCK: Mutex<()> = Mutex::new(());

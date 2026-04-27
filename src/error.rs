@@ -51,17 +51,26 @@ mod tests {
 
     #[test]
     fn not_found_gives_404() {
-        assert_eq!(status_of(AppError::NotFound("not here".into())), StatusCode::NOT_FOUND);
+        assert_eq!(
+            status_of(AppError::NotFound("not here".into())),
+            StatusCode::NOT_FOUND
+        );
     }
 
     #[test]
     fn bad_request_gives_400() {
-        assert_eq!(status_of(AppError::BadRequest("bad".into())), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            status_of(AppError::BadRequest("bad".into())),
+            StatusCode::BAD_REQUEST
+        );
     }
 
     #[test]
     fn internal_gives_500() {
-        assert_eq!(status_of(AppError::Internal("oops".into())), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            status_of(AppError::Internal("oops".into())),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     #[test]

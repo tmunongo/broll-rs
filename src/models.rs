@@ -124,7 +124,10 @@ mod tests {
 
     #[test]
     fn slugify_special_chars() {
-        assert_eq!(slugify("B-Roll: Nature & Wildlife!"), "b-roll-nature-wildlife");
+        assert_eq!(
+            slugify("B-Roll: Nature & Wildlife!"),
+            "b-roll-nature-wildlife"
+        );
     }
 
     #[test]

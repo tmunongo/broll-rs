@@ -42,7 +42,15 @@ pub async fn search(
     if api_key.is_empty() {
         return vec![];
     }
-    match do_search(client, "https://api.pexels.com/videos/search", api_key, query, per_page).await {
+    match do_search(
+        client,
+        "https://api.pexels.com/videos/search",
+        api_key,
+        query,
+        per_page,
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
             tracing::warn!("Pexels search failed: {e}");
@@ -173,7 +181,9 @@ mod tests {
 
         let client = reqwest::Client::new();
         let url = server.uri();
-        let results = do_search(&client, &url, "apikey", "nature", 1).await.unwrap();
+        let results = do_search(&client, &url, "apikey", "nature", 1)
+            .await
+            .unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "pexels_12345");
@@ -204,9 +214,21 @@ mod tests {
     #[test]
     fn pexels_file_best_picks_largest_under_1920() {
         let mut files = vec![
-            PexelsFile { link: "4k.mp4".into(), width: Some(3840), height: Some(2160) },
-            PexelsFile { link: "1080p.mp4".into(), width: Some(1920), height: Some(1080) },
-            PexelsFile { link: "720p.mp4".into(), width: Some(1280), height: Some(720) },
+            PexelsFile {
+                link: "4k.mp4".into(),
+                width: Some(3840),
+                height: Some(2160),
+            },
+            PexelsFile {
+                link: "1080p.mp4".into(),
+                width: Some(1920),
+                height: Some(1080),
+            },
+            PexelsFile {
+                link: "720p.mp4".into(),
+                width: Some(1280),
+                height: Some(720),
+            },
         ];
         files.sort_by_key(|f| std::cmp::Reverse(f.width.unwrap_or(0)));
         let best = files

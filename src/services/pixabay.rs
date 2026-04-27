@@ -46,7 +46,15 @@ pub async fn search(
     if api_key.is_empty() {
         return vec![];
     }
-    match do_search(client, "https://pixabay.com/api/videos/", api_key, query, per_page).await {
+    match do_search(
+        client,
+        "https://pixabay.com/api/videos/",
+        api_key,
+        query,
+        per_page,
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
             tracing::warn!("Pixabay search failed: {e}");
@@ -138,8 +146,16 @@ mod tests {
     #[test]
     fn best_prefers_large() {
         let vids = PixabayVideos {
-            large: Some(PixabayFile { url: "large.mp4".into(), width: Some(1920), height: Some(1080) }),
-            medium: Some(PixabayFile { url: "medium.mp4".into(), width: Some(1280), height: Some(720) }),
+            large: Some(PixabayFile {
+                url: "large.mp4".into(),
+                width: Some(1920),
+                height: Some(1080),
+            }),
+            medium: Some(PixabayFile {
+                url: "medium.mp4".into(),
+                width: Some(1280),
+                height: Some(720),
+            }),
             small: None,
             tiny: None,
         };
@@ -150,7 +166,11 @@ mod tests {
     fn best_falls_back_to_medium() {
         let vids = PixabayVideos {
             large: None,
-            medium: Some(PixabayFile { url: "medium.mp4".into(), width: None, height: None }),
+            medium: Some(PixabayFile {
+                url: "medium.mp4".into(),
+                width: None,
+                height: None,
+            }),
             small: None,
             tiny: None,
         };
@@ -163,7 +183,11 @@ mod tests {
             large: None,
             medium: None,
             small: None,
-            tiny: Some(PixabayFile { url: "tiny.mp4".into(), width: None, height: None }),
+            tiny: Some(PixabayFile {
+                url: "tiny.mp4".into(),
+                width: None,
+                height: None,
+            }),
         };
         assert_eq!(vids.best().unwrap().url, "tiny.mp4");
     }
@@ -214,7 +238,9 @@ mod tests {
 
         let client = reqwest::Client::new();
         let url = server.uri();
-        let results = do_search(&client, &url, "apikey", "nature", 1).await.unwrap();
+        let results = do_search(&client, &url, "apikey", "nature", 1)
+            .await
+            .unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "pixabay_12345");

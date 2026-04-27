@@ -27,14 +27,18 @@ async fn index() -> Html<&'static str> {
     Html(INDEX_HTML)
 }
 
-
-
 pub fn build_app(state: AppState) -> Router {
     Router::new()
         // UI
         .route("/", get(index))
-        .nest_service("/app.css", tower_http::services::ServeFile::new("templates/app.css"))
-        .nest_service("/app.js", tower_http::services::ServeFile::new("templates/app.js"))
+        .nest_service(
+            "/app.css",
+            tower_http::services::ServeFile::new("templates/app.css"),
+        )
+        .nest_service(
+            "/app.js",
+            tower_http::services::ServeFile::new("templates/app.js"),
+        )
         // Search
         .route("/api/search", get(routes::search::handler))
         // Download

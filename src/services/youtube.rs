@@ -18,8 +18,8 @@ struct YtThumb {
     url: String,
 }
 
-pub async fn search(query: &str, count: usize) -> Vec<VideoResult> {
-    match do_search(query, count).await {
+pub async fn search(query: &str, count: usize, browser_cookies: Option<&str>) -> Vec<VideoResult> {
+    match do_search(query, count, browser_cookies).await {
         Ok(v) => v,
         Err(e) => {
             tracing::warn!("YouTube search failed: {e}");
@@ -68,23 +68,34 @@ pub fn parse_yt_dlp_output(stdout: &str) -> Vec<VideoResult> {
         .collect()
 }
 
-async fn do_search(query: &str, count: usize) -> Result<Vec<VideoResult>> {
+async fn do_search(
+    query: &str,
+    count: usize,
+    browser_cookies: Option<&str>,
+) -> Result<Vec<VideoResult>> {
     let search_term = format!("ytsearch{count}:{query}");
 
-    let output = Command::new("yt-dlp")
-        .args([
-            &search_term,
-            "--dump-json",
-            "--no-playlist",
-            "--quiet",
-            "--no-warnings",
-            "--skip-download",
-        ])
-        .output()
-        .await?;
+    let mut args = vec![
+        search_term.as_str(),
+        "--dump-json",
+        "--no-playlist",
+        "--skip-download",
+    ];
+
+    if let Some(browser) = browser_cookies {
+        args.push("--cookies-from-browser");
+        args.push(browser);
+    }
+
+    let output = Command::new("yt-dlp").args(&args).output().await?;
 
     if !output.status.success() {
-        anyhow::bail!("yt-dlp exited with status {}", output.status);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!(
+            "yt-dlp exited with status {}.\nstderr:\n{}",
+            output.status,
+            stderr.trim()
+        );
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -116,7 +127,10 @@ mod tests {
         assert_eq!(results[0].title, "Untitled");
         assert_eq!(results[0].duration, None);
         assert_eq!(results[0].thumbnail, None);
-        assert_eq!(results[0].download_url.as_deref(), Some("https://www.youtube.com/watch?v=abc"));
+        assert_eq!(
+            results[0].download_url.as_deref(),
+            Some("https://www.youtube.com/watch?v=abc")
+        );
     }
 
     #[test]
@@ -141,8 +155,8 @@ mod tests {
         // This will likely fail since yt-dlp might not be installed, or the network might fail.
         // `search` suppresses the error and returns an empty vec.
         // It covers lines 21-28.
-        let res = search("test", 1).await;
-        // We don't assert it's empty, because locally yt-dlp might succeed, 
+        let res = search("test", 1, None).await;
+        // We don't assert it's empty, because locally yt-dlp might succeed,
         // but it exercises the code nevertheless.
         let _ = res;
     }

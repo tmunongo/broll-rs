@@ -127,14 +127,17 @@ fn parse_runtime(s: &str) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::method;
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     // ── parse_runtime ──────────────────────────────────────────────────────────
 
     #[test]
     fn parse_hms() {
-        assert_eq!(parse_runtime("1:02:03"), Some(1.0 * 3600.0 + 2.0 * 60.0 + 3.0));
+        assert_eq!(
+            parse_runtime("1:02:03"),
+            Some(1.0 * 3600.0 + 2.0 * 60.0 + 3.0)
+        );
     }
 
     #[test]
@@ -208,7 +211,7 @@ mod tests {
 
         let client = reqwest::Client::new();
         // Call do_search with the mock server URL
-        let url = server.uri(); 
+        let url = server.uri();
         let results = do_search(&client, &url, "test", 10).await.unwrap();
 
         assert_eq!(results.len(), 2);

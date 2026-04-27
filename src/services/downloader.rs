@@ -24,7 +24,7 @@ pub async fn run(
     }
 
     let result = match req.source.as_str() {
-        "youtube" => download_ytdlp(&req.download_url, &dir, &req.id).await,
+        "youtube" => download_ytdlp(&req.download_url, &dir, &req.id, config.as_ref()).await,
         "archive" => download_archive(&http, &req.download_url, &dir, &req.id).await,
         _ => download_direct(&http, &req.download_url, &dir, &req.id).await,
     };
@@ -76,25 +76,32 @@ async fn resolve_dir(pool: &SqlitePool, config: &Config, project_id: Option<&str
 
 // ── yt-dlp ────────────────────────────────────────────────────────────────────
 
-async fn download_ytdlp(url: &str, dir: &Path, id: &str) -> Result<PathBuf> {
+async fn download_ytdlp(url: &str, dir: &Path, id: &str, config: &Config) -> Result<PathBuf> {
     let safe_id = id.replace('/', "_");
     let template = dir
         .join(format!("{safe_id}.%(ext)s"))
         .to_string_lossy()
         .to_string();
 
+    let mut args = vec![
+        url,
+        "-o",
+        &template,
+        "--no-playlist",
+        "--quiet",
+        "--merge-output-format",
+        "mp4",
+        "-f",
+        "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+    ];
+
+    if let Some(browser) = &config.youtube_cookies_browser {
+        args.push("--cookies-from-browser");
+        args.push(browser);
+    }
+
     let output = Command::new("yt-dlp")
-        .args([
-            url,
-            "-o",
-            &template,
-            "--no-playlist",
-            "--quiet",
-            "--merge-output-format",
-            "mp4",
-            "-f",
-            "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
-        ])
+        .args(&args)
         .output()
         .await
         .context("yt-dlp not found — install with: pip install yt-dlp")?;
@@ -212,7 +219,10 @@ mod tests {
 
     #[test]
     fn ext_from_url_with_query_string() {
-        assert_eq!(ext_from_url("https://example.com/video.webm?token=abc"), "webm");
+        assert_eq!(
+            ext_from_url("https://example.com/video.webm?token=abc"),
+            "webm"
+        );
     }
 
     #[test]
@@ -276,7 +286,9 @@ mod tests {
         let client = reqwest::Client::new();
         let url = format!("{}/video.mp4", server.uri());
 
-        let path = download_direct(&client, &url, dir.path(), "test_id").await.unwrap();
+        let path = download_direct(&client, &url, dir.path(), "test_id")
+            .await
+            .unwrap();
         assert!(path.exists());
 
         let contents = tokio::fs::read(&path).await.unwrap();
@@ -311,6 +323,7 @@ mod tests {
             downloads_dir: std::path::PathBuf::from("/tmp/broll-test"),
             database_url: "sqlite::memory:".into(),
             port: 8000,
+            youtube_cookies_browser: None,
         };
 
         let dir = resolve_dir(&pool, &config, None).await;
@@ -326,6 +339,7 @@ mod tests {
             downloads_dir: std::path::PathBuf::from("/tmp/broll-test"),
             database_url: "sqlite::memory:".into(),
             port: 8000,
+            youtube_cookies_browser: None,
         };
 
         let dir = resolve_dir(&pool, &config, Some("unknown-id")).await;
@@ -348,6 +362,7 @@ mod tests {
             downloads_dir: std::path::PathBuf::from("/tmp/broll-test"),
             database_url: "sqlite::memory:".into(),
             port: 8000,
+            youtube_cookies_browser: None,
         };
 
         let dir = resolve_dir(&pool, &config, Some("p1")).await;
