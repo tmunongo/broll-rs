@@ -4,6 +4,7 @@
 *.db
 target/
 downloads/
+*.mp4
 
 sqlite*
 *.sqlite
