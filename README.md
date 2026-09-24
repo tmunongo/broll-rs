@@ -8,12 +8,11 @@ Organise downloads into **projects** — each project gets its own subdirectory.
 
 ## Quick Start (Using Make)
 
-We provide a `Makefile` for streamlined local development and versioning.
+We provide a `Makefile` for streamlined local development.
 
 ```bash
 # Prerequisites
-# 1. Install Rust via rustup (https://rustup.rs/):
-#    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# 1. Install Go 1.22+ (https://go.dev/dl/)
 # 2. Install ffmpeg & python3 via your OS package manager:
 #    macOS: brew install ffmpeg python3
 #    Debian/Ubuntu: apt install ffmpeg python3
@@ -42,8 +41,8 @@ make install-hooks
 ```
 You can also manually run the tests and checks via:
 ```bash
-make check   # Runs clippy and rustfmt
-make test    # Runs cargo test
+make check   # Runs go vet & gofmt checks
+make test    # Runs go test
 make precommit # Runs both
 ```
 
@@ -58,15 +57,6 @@ A GitHub Actions workflow is included (`.github/workflows/docker.yml`) that auto
 ```bash
 docker-compose up --build
 ```
-
-### Releasing a new version via Makefile
-When you're ready to deploy a new version to GHCR, use the release commands:
-```bash
-make version-patch   # Bumps v0.1.0 -> v0.1.1
-make version-minor   # Bumps v0.1.0 -> v0.2.0
-make version-major   # Bumps v0.1.0 -> v1.0.0
-```
-This automatically updates `Cargo.toml`, creates a git commit, and tags the release. Just run `git push && git push --tags` afterwards to trigger the GitHub Actions pipeline.
 
 ---
 
@@ -95,7 +85,6 @@ The left sidebar lets you filter the library by project.
 | `DATABASE_URL`   | `sqlite://library.db`| SQLite path              |
 | `DOWNLOADS_DIR`  | `./downloads`        | Root downloads directory |
 | `PORT`           | `8000`               | Listening port           |
-| `RUST_LOG`       | `broll_rs=info`      | Log level                |
 
 API keys from pexels.com/api and pixabay.com/api/docs (both free, unlimited).
 
@@ -124,20 +113,20 @@ DELETE /api/projects/:id
 Browser (Alpine.js)
     │
     ▼
-Axum (thin control layer — single binary)
-    ├── GET /api/search ──→  tokio::join! across:
-    │                          reqwest → Pexels API
-    │                          reqwest → Pixabay API
-    │                          reqwest → Archive.org
-    │                          tokio::process → yt-dlp --dump-json
+Go Server (chi + GORM — single binary)
+    ├── GET /api/search ──→  Parallel goroutines across:
+    │                          net/http → Pexels API
+    │                          net/http → Pixabay API
+    │                          net/http → Archive.org
+    │                          exec.Command → yt-dlp --dump-json
     │
-    ├── POST /api/download ──→  tokio::spawn (non-blocking)
+    ├── POST /api/download ──→  goroutine (non-blocking)
     │                              └── yt-dlp subprocess  (YouTube)
-    │                              └── reqwest stream     (others)
+    │                              └── net/http stream    (others)
     │                              └── writes to downloads/{project_slug}/
     │
-    ├── /api/library ──→  SQLite via sqlx
-    └── /api/projects ──→  SQLite via sqlx
+    ├── /api/library ──→  SQLite via GORM
+    └── /api/projects ──→  SQLite via GORM
 ```
 
 ---
@@ -145,24 +134,13 @@ Axum (thin control layer — single binary)
 ## Source Structure
 
 ```
-src/
-├── main.rs                 Router assembly + startup
-├── config.rs               Env var config
-├── db.rs                   SQLite pool + schema
-├── error.rs                AppError + AppResult
-├── models.rs               All types (VideoResult, Project, ...)
-├── state.rs                AppState (pool, config, http client)
-├── routes/
-│   ├── search.rs           Fan-out search handler
-│   ├── download.rs         Queue + status
-│   ├── library.rs          List, delete, tag, serve file
-│   └── projects.rs         CRUD
-└── services/
-    ├── pexels.rs
-    ├── pixabay.rs
-    ├── archive.rs
-    ├── youtube.rs          yt-dlp subprocess adapter
-    └── downloader.rs       Background download pipeline
+├── main.go                 Server entry point
+├── pkg/
+│   ├── config/             Env var configuration
+│   ├── db/                 GORM SQLite initialization & migrations
+│   ├── models/             Data models & slugify utility
+│   ├── routes/             HTTP router (Chi) & API endpoints
+│   └── services/           Pexels, Pixabay, Archive, YouTube, Downloader
 templates/
-└── index.html              Embedded at compile time (include_str!)
+└── index.html              Embedded at compile time (go:embed)
 ```

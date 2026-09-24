@@ -1,25 +1,13 @@
 # ── Build stage ───────────────────────────────────────────────────────────────
-FROM rust:1.94-slim AS builder
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev gcc libc6-dev \
-    && rm -rf /var/lib/apt/lists/*
+FROM golang:1.27-bookworm AS builder
 
 WORKDIR /build
 
-# Cache dependencies by creating a dummy main.rs
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release
-RUN rm -rf src
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Copy actual source code
-COPY src ./src
-COPY templates ./templates
-
-# Touch main.rs to ensure Cargo realizes it needs to be rebuilt
-RUN touch src/main.rs
-RUN cargo build --release
+COPY . .
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o broll-rs main.go
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM debian:bookworm-slim
@@ -34,7 +22,7 @@ RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
     -o /usr/local/bin/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp
 
-COPY --from=builder /build/target/release/broll-rs /usr/local/bin/broll-rs
+COPY --from=builder /build/broll-rs /usr/local/bin/broll-rs
 
 WORKDIR /app
 

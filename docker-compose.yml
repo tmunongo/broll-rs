@@ -13,5 +13,4 @@ services:
       - PIXABAY_API_KEY=${PIXABAY_API_KEY:-}
       - DATABASE_URL=sqlite:///app/library.db
       - DOWNLOADS_DIR=/app/downloads
-      - RUST_LOG=broll_rs=info
     restart: unless-stopped
