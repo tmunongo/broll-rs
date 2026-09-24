@@ -98,6 +98,12 @@ func DownloadYTDLP(urlStr, dir, id string, cfg config.Config) (string, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		if cfg.YouTubeCookiesBrowser != nil && *cfg.YouTubeCookiesBrowser != "" {
+			log.Printf("yt-dlp download with cookies (%s) failed: %v (stderr: %s); retrying without cookies", *cfg.YouTubeCookiesBrowser, err, strings.TrimSpace(stderr.String()))
+			cfgNoCookies := cfg
+			cfgNoCookies.YouTubeCookiesBrowser = nil
+			return DownloadYTDLP(urlStr, dir, id, cfgNoCookies)
+		}
 		return "", fmt.Errorf("yt-dlp error: %w, stderr: %s", err, stderr.String())
 	}
 

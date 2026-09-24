@@ -53,6 +53,10 @@ func DoYouTubeSearch(query string, count int, browserCookies *string) ([]models.
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		if browserCookies != nil && *browserCookies != "" {
+			log.Printf("yt-dlp search with cookies (%s) failed: %v (stderr: %s); retrying without cookies", *browserCookies, err, strings.TrimSpace(stderr.String()))
+			return DoYouTubeSearch(query, count, nil)
+		}
 		return nil, fmt.Errorf("yt-dlp failed: %w, stderr: %s", err, stderr.String())
 	}
 
