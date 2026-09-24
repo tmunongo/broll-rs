@@ -15,3 +15,5 @@ sqlite*
 
 download_error.txt
 .log
+
+.DS_Store
