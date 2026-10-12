@@ -85,6 +85,7 @@ func (app *App) handleAppJS(w http.ResponseWriter, r *http.Request) {
 }
 
 const searchTimeout = 15 * time.Second
+const youtubeSearchTimeout = 45 * time.Second
 
 func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -149,7 +150,7 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			t := time.Now()
-			ctx, cancel := context.WithTimeout(r.Context(), searchTimeout)
+			ctx, cancel := context.WithTimeout(r.Context(), youtubeSearchTimeout)
 			defer cancel()
 			res := services.YouTubeSearch(ctx, q, 4, app.Config.YouTubeCookiesBrowser)
 			log.Printf("[search] youtube: %d results in %s", len(res), time.Since(t).Round(time.Millisecond))
