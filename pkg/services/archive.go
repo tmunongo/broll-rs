@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -31,8 +32,8 @@ type ArchiveDoc struct {
 	Runtime    json.RawMessage `json:"runtime"`
 }
 
-func ArchiveSearch(client *http.Client, query string, rows int) []models.VideoResult {
-	results, err := DoArchiveSearch(client, ArchiveSearchURL, query, rows)
+func ArchiveSearch(ctx context.Context, client *http.Client, query string, rows int) []models.VideoResult {
+	results, err := DoArchiveSearch(ctx, client, ArchiveSearchURL, query, rows)
 	if err != nil {
 		log.Printf("Archive search failed: %v", err)
 		return []models.VideoResult{}
@@ -40,7 +41,7 @@ func ArchiveSearch(client *http.Client, query string, rows int) []models.VideoRe
 	return results
 }
 
-func DoArchiveSearch(client *http.Client, searchURL, query string, rows int) ([]models.VideoResult, error) {
+func DoArchiveSearch(ctx context.Context, client *http.Client, searchURL, query string, rows int) ([]models.VideoResult, error) {
 	reqURL, err := url.Parse(searchURL)
 	if err != nil {
 		return nil, err
@@ -56,7 +57,12 @@ func DoArchiveSearch(client *http.Client, searchURL, query string, rows int) ([]
 	q.Add("sort[]", "downloads desc")
 	reqURL.RawQuery = q.Encode()
 
-	resp, err := client.Get(reqURL.String())
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -58,7 +59,7 @@ func TestArchiveSearchReturnsEmptyOnAPIError(t *testing.T) {
 	defer server.Close()
 
 	client := server.Client()
-	_, err := services.DoArchiveSearch(client, server.URL, "test_query", 1)
+	_, err := services.DoArchiveSearch(context.Background(), client, server.URL, "test_query", 1)
 	if err == nil {
 		t.Error("expected error on HTTP 500, got nil")
 	}
@@ -88,7 +89,7 @@ func TestDoArchiveSearchParsesResponse(t *testing.T) {
 	defer server.Close()
 
 	client := server.Client()
-	results, err := services.DoArchiveSearch(client, server.URL, "test", 10)
+	results, err := services.DoArchiveSearch(context.Background(), client, server.URL, "test", 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -112,7 +113,7 @@ func TestArchiveSearchTimeoutReturnsEmpty(t *testing.T) {
 	client := &http.Client{
 		Timeout: 1 * time.Millisecond,
 	}
-	results := services.ArchiveSearch(client, "rust programming", 2)
+	results := services.ArchiveSearch(context.Background(), client, "rust programming", 2)
 	if len(results) != 0 {
 		t.Errorf("expected empty results on timeout, got %d", len(results))
 	}

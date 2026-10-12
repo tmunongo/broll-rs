@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -83,7 +84,7 @@ func TestBestReturnsNilWhenAllNil(t *testing.T) {
 
 func TestPixabaySearchReturnsEmptyWhenKeyIsEmpty(t *testing.T) {
 	client := &http.Client{}
-	results := services.PixabaySearch(client, "", "nature", 5)
+	results := services.PixabaySearch(context.Background(), client, "", "nature", 5)
 	if len(results) != 0 {
 		t.Errorf("expected empty results, got %d", len(results))
 	}
@@ -109,7 +110,7 @@ func TestPixabaySearchParsesResponseCorrectly(t *testing.T) {
 	defer server.Close()
 
 	client := server.Client()
-	results, err := services.DoPixabaySearch(client, server.URL, "apikey", "nature", 1)
+	results, err := services.DoPixabaySearch(context.Background(), client, server.URL, "apikey", "nature", 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

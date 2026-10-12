@@ -3,6 +3,7 @@ package services
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -25,16 +26,20 @@ type YtThumb struct {
 	URL string `json:"url"`
 }
 
-func YouTubeSearch(query string, count int, browserCookies *string) []models.VideoResult {
-	results, err := DoYouTubeSearch(query, count, browserCookies)
+func YouTubeSearch(ctx context.Context, query string, count int, browserCookies *string) []models.VideoResult {
+	results, err := DoYouTubeSearch(ctx, query, count, browserCookies)
 	if err != nil {
-		log.Printf("YouTube search failed: %v", err)
+		if ctx.Err() != nil {
+			log.Printf("YouTube search timed out: %v", err)
+		} else {
+			log.Printf("YouTube search failed: %v", err)
+		}
 		return []models.VideoResult{}
 	}
 	return results
 }
 
-func DoYouTubeSearch(query string, count int, browserCookies *string) ([]models.VideoResult, error) {
+func DoYouTubeSearch(ctx context.Context, query string, count int, browserCookies *string) ([]models.VideoResult, error) {
 	searchTerm := fmt.Sprintf("ytsearch%d:%s", count, query)
 	args := []string{
 		searchTerm,
@@ -47,15 +52,18 @@ func DoYouTubeSearch(query string, count int, browserCookies *string) ([]models.
 		args = append(args, "--cookies-from-browser", *browserCookies)
 	}
 
-	cmd := exec.Command("yt-dlp", args...)
+	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("yt-dlp timed out: %w", ctx.Err())
+		}
 		if browserCookies != nil && *browserCookies != "" {
 			log.Printf("yt-dlp search with cookies (%s) failed: %v (stderr: %s); retrying without cookies", *browserCookies, err, strings.TrimSpace(stderr.String()))
-			return DoYouTubeSearch(query, count, nil)
+			return DoYouTubeSearch(ctx, query, count, nil)
 		}
 		return nil, fmt.Errorf("yt-dlp failed: %w, stderr: %s", err, stderr.String())
 	}

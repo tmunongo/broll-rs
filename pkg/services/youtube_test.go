@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"context"
 	"testing"
 
 	"broll-rs/pkg/services"
@@ -81,6 +82,6 @@ func TestParseYtDlpOutputIgnoresInvalidJSON(t *testing.T) {
 
 func TestYouTubeSearchHandlesCommandFailureGracefully(t *testing.T) {
 	// Call YouTubeSearch with dummy query; even if command fails, returns slice gracefully
-	res := services.YouTubeSearch("test", 1, nil)
+	res := services.YouTubeSearch(context.Background(), "test", 1, nil)
 	_ = res
 }

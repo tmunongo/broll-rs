@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -58,11 +59,11 @@ func Titlecase(s string) string {
 	return string(runes)
 }
 
-func PixabaySearch(client *http.Client, apiKey, query string, perPage int) []models.VideoResult {
+func PixabaySearch(ctx context.Context, client *http.Client, apiKey, query string, perPage int) []models.VideoResult {
 	if apiKey == "" {
 		return []models.VideoResult{}
 	}
-	results, err := DoPixabaySearch(client, "https://pixabay.com/api/videos/", apiKey, query, perPage)
+	results, err := DoPixabaySearch(ctx, client, "https://pixabay.com/api/videos/", apiKey, query, perPage)
 	if err != nil {
 		log.Printf("Pixabay search failed: %v", err)
 		return []models.VideoResult{}
@@ -70,7 +71,7 @@ func PixabaySearch(client *http.Client, apiKey, query string, perPage int) []mod
 	return results
 }
 
-func DoPixabaySearch(client *http.Client, searchURL, apiKey, query string, perPage int) ([]models.VideoResult, error) {
+func DoPixabaySearch(ctx context.Context, client *http.Client, searchURL, apiKey, query string, perPage int) ([]models.VideoResult, error) {
 	reqURL, err := url.Parse(searchURL)
 	if err != nil {
 		return nil, err
@@ -83,7 +84,12 @@ func DoPixabaySearch(client *http.Client, searchURL, apiKey, query string, perPa
 	q.Set("video_type", "film")
 	reqURL.RawQuery = q.Encode()
 
-	resp, err := client.Get(reqURL.String())
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

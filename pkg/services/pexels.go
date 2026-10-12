@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -38,11 +39,11 @@ type PexelsPicture struct {
 	Picture string `json:"picture"`
 }
 
-func PexelsSearch(client *http.Client, apiKey, query string, perPage int) []models.VideoResult {
+func PexelsSearch(ctx context.Context, client *http.Client, apiKey, query string, perPage int) []models.VideoResult {
 	if apiKey == "" {
 		return []models.VideoResult{}
 	}
-	results, err := DoPexelsSearch(client, "https://api.pexels.com/videos/search", apiKey, query, perPage)
+	results, err := DoPexelsSearch(ctx, client, "https://api.pexels.com/videos/search", apiKey, query, perPage)
 	if err != nil {
 		log.Printf("Pexels search failed: %v", err)
 		return []models.VideoResult{}
@@ -50,7 +51,7 @@ func PexelsSearch(client *http.Client, apiKey, query string, perPage int) []mode
 	return results
 }
 
-func DoPexelsSearch(client *http.Client, searchURL, apiKey, query string, perPage int) ([]models.VideoResult, error) {
+func DoPexelsSearch(ctx context.Context, client *http.Client, searchURL, apiKey, query string, perPage int) ([]models.VideoResult, error) {
 	reqURL, err := url.Parse(searchURL)
 	if err != nil {
 		return nil, err
@@ -62,7 +63,7 @@ func DoPexelsSearch(client *http.Client, searchURL, apiKey, query string, perPag
 	q.Set("size", "medium")
 	reqURL.RawQuery = q.Encode()
 
-	req, err := http.NewRequest("GET", reqURL.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}

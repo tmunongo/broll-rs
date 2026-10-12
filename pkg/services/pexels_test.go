@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,7 @@ import (
 
 func TestPexelsSearchReturnsEmptyWhenKeyIsEmpty(t *testing.T) {
 	client := &http.Client{}
-	results := services.PexelsSearch(client, "", "nature", 5)
+	results := services.PexelsSearch(context.Background(), client, "", "nature", 5)
 	if len(results) != 0 {
 		t.Errorf("expected empty results, got %d", len(results))
 	}
@@ -24,7 +25,7 @@ func TestPexelsSearchReturnsEmptyOnHTTPError(t *testing.T) {
 	defer server.Close()
 
 	client := server.Client()
-	_, err := services.DoPexelsSearch(client, server.URL, "valid_key", "test", 1)
+	_, err := services.DoPexelsSearch(context.Background(), client, server.URL, "valid_key", "test", 1)
 	if err == nil {
 		t.Error("expected error on HTTP 500, got nil")
 	}
@@ -54,7 +55,7 @@ func TestPexelsSearchParsesResponseCorrectly(t *testing.T) {
 	defer server.Close()
 
 	client := server.Client()
-	results, err := services.DoPexelsSearch(client, server.URL, "apikey", "nature", 1)
+	results, err := services.DoPexelsSearch(context.Background(), client, server.URL, "apikey", "nature", 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

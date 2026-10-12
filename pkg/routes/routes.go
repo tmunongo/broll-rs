@@ -1,8 +1,10 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -82,12 +84,16 @@ func (app *App) handleAppJS(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(templates.AppJS))
 }
 
+const searchTimeout = 15 * time.Second
+
 func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	sources := r.URL.Query().Get("sources")
 	if sources == "" {
 		sources = "pexels,pixabay,archive,youtube"
 	}
+
+	start := time.Now()
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -97,7 +103,11 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			res := services.PexelsSearch(app.HTTP, app.Config.PexelsAPIKey, q, 8)
+			t := time.Now()
+			ctx, cancel := context.WithTimeout(r.Context(), searchTimeout)
+			defer cancel()
+			res := services.PexelsSearch(ctx, app.HTTP, app.Config.PexelsAPIKey, q, 8)
+			log.Printf("[search] pexels: %d results in %s", len(res), time.Since(t).Round(time.Millisecond))
 			mu.Lock()
 			combined = append(combined, res...)
 			mu.Unlock()
@@ -108,7 +118,11 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			res := services.PixabaySearch(app.HTTP, app.Config.PixabayAPIKey, q, 8)
+			t := time.Now()
+			ctx, cancel := context.WithTimeout(r.Context(), searchTimeout)
+			defer cancel()
+			res := services.PixabaySearch(ctx, app.HTTP, app.Config.PixabayAPIKey, q, 8)
+			log.Printf("[search] pixabay: %d results in %s", len(res), time.Since(t).Round(time.Millisecond))
 			mu.Lock()
 			combined = append(combined, res...)
 			mu.Unlock()
@@ -119,7 +133,11 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			res := services.ArchiveSearch(app.HTTP, q, 6)
+			t := time.Now()
+			ctx, cancel := context.WithTimeout(r.Context(), searchTimeout)
+			defer cancel()
+			res := services.ArchiveSearch(ctx, app.HTTP, q, 6)
+			log.Printf("[search] archive: %d results in %s", len(res), time.Since(t).Round(time.Millisecond))
 			mu.Lock()
 			combined = append(combined, res...)
 			mu.Unlock()
@@ -130,7 +148,11 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			res := services.YouTubeSearch(q, 8, app.Config.YouTubeCookiesBrowser)
+			t := time.Now()
+			ctx, cancel := context.WithTimeout(r.Context(), searchTimeout)
+			defer cancel()
+			res := services.YouTubeSearch(ctx, q, 4, app.Config.YouTubeCookiesBrowser)
+			log.Printf("[search] youtube: %d results in %s", len(res), time.Since(t).Round(time.Millisecond))
 			mu.Lock()
 			combined = append(combined, res...)
 			mu.Unlock()
@@ -138,6 +160,7 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wg.Wait()
+	log.Printf("[search] total: %d results in %s", len(combined), time.Since(start).Round(time.Millisecond))
 	jsonResponse(w, http.StatusOK, combined)
 }
 
