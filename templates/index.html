@@ -120,14 +120,19 @@
     <div class="results-panel">
       <div class="panel-header">
         <span class="panel-title">Search Results</span>
-        <span class="count-badge" x-show="results.length > 0"
-          style="font-family:var(--mono);font-size:10px;color:var(--amber);background:rgba(212,168,67,.08);border:1px solid rgba(212,168,67,.2);padding:2px 8px;border-radius:2px;"
-          x-text="results.length + ' clips'">
-        </span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="searching-badge" x-show="loading && results.length > 0">
+            <span class="spinner-dot"></span> Searching other sources…
+          </span>
+          <span class="count-badge" x-show="results.length > 0"
+            style="font-family:var(--mono);font-size:10px;color:var(--amber);background:rgba(212,168,67,.08);border:1px solid rgba(212,168,67,.2);padding:2px 8px;border-radius:2px;"
+            x-text="results.length + ' clips'">
+          </span>
+        </div>
       </div>
 
-      <!-- Shimmer -->
-      <div class="shimmer-grid" x-show="loading">
+      <!-- Shimmer (initial load with no results yet) -->
+      <div class="shimmer-grid" x-show="loading && results.length === 0">
         <template x-for="i in 10"><div class="shimmer-card">
           <div class="shimmer-thumb"></div>
           <div class="shimmer-line"></div>
@@ -135,8 +140,8 @@
         </div></template>
       </div>
 
-      <!-- Results -->
-      <div class="video-grid" x-show="!loading && results.length > 0">
+      <!-- Results (visible as soon as clips start arriving) -->
+      <div class="video-grid" x-show="results.length > 0">
         <template x-for="video in results" :key="video.id">
           <div
             class="video-card"

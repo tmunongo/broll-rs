@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"broll-rs/pkg/config"
@@ -351,6 +352,22 @@ func TestSearchWithNoRealKeysReturnsEmptyOrResults(t *testing.T) {
 	}
 	var results []models.VideoResult
 	parseJSON(t, rr, &results)
+}
+
+func TestSearchStreamReturnsSSE(t *testing.T) {
+	app := buildTestApp(t)
+	req, _ := http.NewRequest("GET", "/api/search?q=nature&sources=pexels,pixabay&stream=true", nil)
+	rr := executeRequest(app, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "text/event-stream" {
+		t.Errorf("expected Content-Type text/event-stream, got %s", ct)
+	}
+	if !strings.Contains(rr.Body.String(), "event: done") {
+		t.Errorf("expected body to contain 'event: done', got %s", rr.Body.String())
+	}
 }
 
 func TestListLibraryWithSeedData(t *testing.T) {

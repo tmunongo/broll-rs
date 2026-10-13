@@ -18,3 +18,5 @@ download_error.txt
 
 .DS_Store
 broll-rs
+
+tmp/

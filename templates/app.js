@@ -6,6 +6,7 @@ function brollApp() {
     loading: false,
     searched: false,
     selected: null,
+    searchEventSource: null,
     sources: [
       { id: 'pexels',  label: 'Pexels',  on: true },
       { id: 'pixabay', label: 'Pixabay', on: true },
@@ -63,27 +64,71 @@ function brollApp() {
     },
 
     // ── Search ────────────────────────────────────────────────────────
-    async doSearch() {
+    doSearch() {
       const q = this.query.trim();
       if (!q) return;
+
+      if (this.searchEventSource) {
+        this.searchEventSource.close();
+        this.searchEventSource = null;
+      }
+
       this.loading = true;
       this.searched = true;
       this.results = [];
-      try {
-        const sources = this.sources.filter(s => s.on).map(s => s.id).join(',');
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&sources=${sources}`);
-        if (!res.ok) throw new Error(await res.text());
-        this.results = await res.json();
-      } catch (e) {
-        this.toast('Search failed: ' + e.message, 'error');
-      } finally {
+
+      const sources = this.sources.filter(s => s.on).map(s => s.id).join(',');
+      const url = `/api/search?q=${encodeURIComponent(q)}&sources=${sources}&stream=true`;
+      console.log(`[search] starting streaming search: ${url}`);
+      const es = new EventSource(url);
+      this.searchEventSource = es;
+
+      es.addEventListener('results', (e) => {
+        try {
+          const batch = JSON.parse(e.data);
+          if (Array.isArray(batch) && batch.length > 0) {
+            console.log(`[search] stream batch arrived: ${batch.length} clip(s) from ${batch[0]?.source || 'source'}`);
+            const existingIds = new Set(this.results.map(v => v.id));
+            const newItems = batch.filter(v => !existingIds.has(v.id));
+            this.results = [...this.results, ...newItems];
+          }
+        } catch (err) {
+          console.error('Failed to parse search batch', err);
+        }
+      });
+
+      es.addEventListener('done', () => {
+        console.log(`[search] stream completed, total clips: ${this.results.length}`);
         this.loading = false;
-      }
+        if (this.searchEventSource === es) {
+          es.close();
+          this.searchEventSource = null;
+        }
+      });
+
+      es.onerror = (err) => {
+        console.warn('[search] stream disconnected or error', err);
+        if (this.searchEventSource === es) {
+          es.close();
+          this.searchEventSource = null;
+          this.loading = false;
+          if (this.results.length === 0) {
+            this.toast('Search returned no results or connection failed', 'error');
+          }
+        }
+      };
     },
 
     clearSearch() {
-      this.query = ''; this.results = [];
-      this.searched = false; this.selected = null;
+      if (this.searchEventSource) {
+        this.searchEventSource.close();
+        this.searchEventSource = null;
+      }
+      this.query = '';
+      this.results = [];
+      this.searched = false;
+      this.selected = null;
+      this.loading = false;
     },
 
     // ── Preview ───────────────────────────────────────────────────────

@@ -71,21 +71,29 @@ func jsonError(w http.ResponseWriter, status int, msg string) {
 
 func (app *App) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	_, _ = w.Write([]byte(templates.IndexHTML))
 }
 
 func (app *App) handleAppCSS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	_, _ = w.Write([]byte(templates.AppCSS))
 }
 
 func (app *App) handleAppJS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	_, _ = w.Write([]byte(templates.AppJS))
 }
 
 const searchTimeout = 15 * time.Second
 const youtubeSearchTimeout = 45 * time.Second
+
+type searchBatch struct {
+	source  string
+	results []models.VideoResult
+}
 
 func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -95,10 +103,8 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
-
+	batchChan := make(chan searchBatch, 4)
 	var wg sync.WaitGroup
-	var mu sync.Mutex
-	combined := []models.VideoResult{}
 
 	if strings.Contains(sources, "pexels") {
 		wg.Add(1)
@@ -109,9 +115,10 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 			defer cancel()
 			res := services.PexelsSearch(ctx, app.HTTP, app.Config.PexelsAPIKey, q, 8)
 			log.Printf("[search] pexels: %d results in %s", len(res), time.Since(t).Round(time.Millisecond))
-			mu.Lock()
-			combined = append(combined, res...)
-			mu.Unlock()
+			select {
+			case <-r.Context().Done():
+			case batchChan <- searchBatch{source: "pexels", results: res}:
+			}
 		}()
 	}
 
@@ -124,9 +131,10 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 			defer cancel()
 			res := services.PixabaySearch(ctx, app.HTTP, app.Config.PixabayAPIKey, q, 8)
 			log.Printf("[search] pixabay: %d results in %s", len(res), time.Since(t).Round(time.Millisecond))
-			mu.Lock()
-			combined = append(combined, res...)
-			mu.Unlock()
+			select {
+			case <-r.Context().Done():
+			case batchChan <- searchBatch{source: "pixabay", results: res}:
+			}
 		}()
 	}
 
@@ -139,9 +147,10 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 			defer cancel()
 			res := services.ArchiveSearch(ctx, app.HTTP, q, 6)
 			log.Printf("[search] archive: %d results in %s", len(res), time.Since(t).Round(time.Millisecond))
-			mu.Lock()
-			combined = append(combined, res...)
-			mu.Unlock()
+			select {
+			case <-r.Context().Done():
+			case batchChan <- searchBatch{source: "archive", results: res}:
+			}
 		}()
 	}
 
@@ -154,13 +163,58 @@ func (app *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 			defer cancel()
 			res := services.YouTubeSearch(ctx, q, 4, app.Config.YouTubeCookiesBrowser)
 			log.Printf("[search] youtube: %d results in %s", len(res), time.Since(t).Round(time.Millisecond))
-			mu.Lock()
-			combined = append(combined, res...)
-			mu.Unlock()
+			select {
+			case <-r.Context().Done():
+			case batchChan <- searchBatch{source: "youtube", results: res}:
+			}
 		}()
 	}
 
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(batchChan)
+	}()
+
+	flusher, isFlusher := w.(http.Flusher)
+	isStream := isFlusher && (strings.Contains(r.Header.Get("Accept"), "text/event-stream") ||
+		r.URL.Query().Get("stream") == "true" ||
+		r.URL.Query().Get("stream") == "1")
+
+	if isStream {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("X-Accel-Buffering", "no")
+		flusher.Flush()
+
+		totalResults := 0
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case batch, ok := <-batchChan:
+				if !ok {
+					log.Printf("[search] stream finished: %d results in %s", totalResults, time.Since(start).Round(time.Millisecond))
+					fmt.Fprintf(w, "event: done\ndata: {}\n\n")
+					flusher.Flush()
+					return
+				}
+				totalResults += len(batch.results)
+				if len(batch.results) > 0 {
+					data, err := json.Marshal(batch.results)
+					if err == nil {
+						fmt.Fprintf(w, "event: results\ndata: %s\n\n", data)
+						flusher.Flush()
+					}
+				}
+			}
+		}
+	}
+
+	combined := []models.VideoResult{}
+	for batch := range batchChan {
+		combined = append(combined, batch.results...)
+	}
 	log.Printf("[search] total: %d results in %s", len(combined), time.Since(start).Round(time.Millisecond))
 	jsonResponse(w, http.StatusOK, combined)
 }

@@ -10,3 +10,5 @@ var AppCSS string
 
 //go:embed app.js
 var AppJS string
+
+// Package templates embeds frontend static assets.
